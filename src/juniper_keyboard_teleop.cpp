@@ -21,6 +21,9 @@ class KeyboardTeleopNode : public rclcpp::Node
     {
         publisher_ = this->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);
         timer_ = this->create_wall_timer(100ms, std::bind(&KeyboardTeleopNode::timer_callback, this));
+
+        this->declare_parameter<float>("linear_vel", 0.35);
+        this->declare_parameter<float>("angular_vel", 2.5);
     
         // Initialize SDL, shutdown the node if SDL fails to initialize
         if (SDL_Init(SDL_INIT_VIDEO) < 0) {
@@ -63,8 +66,6 @@ class KeyboardTeleopNode : public rclcpp::Node
     SDL_Rect squares[9];
     int keyboard_array[5] = {}; //up, down, right, left, head state
     geometry_msgs::msg::Twist twist;
-    float linear_vel_x = 0.35;
-    float angular_vel_z = 2.5;
     int desired_head_state = 0;
     int current_head_state = 0;
 
@@ -73,8 +74,14 @@ class KeyboardTeleopNode : public rclcpp::Node
 
     void timer_callback()
     {
+        float linear_vel_x = this->get_parameter("linear_vel").get_value<float>();;
+        float angular_vel_z = this->get_parameter("angular_vel").get_value<float>();;
+
         //Holds the sum of keyboard_array drive indicies (0-3)
         int drive_sum = 0;
+
+        //The number of tries to wait for the /actuate_head service
+        int service_try_count = 0;
 
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
@@ -119,7 +126,7 @@ class KeyboardTeleopNode : public rclcpp::Node
                         rclcpp::shutdown();
                         return;
                     default:
-                        RCLCPP_INFO(this->get_logger(), "Invalid Key Selection");
+                        RCLCPP_INFO(this->get_logger(), "Invalid Key Selection: use the arrow keys to drive and numbers 0-6 to move the head");
                         break;
                 }
             }
@@ -211,11 +218,16 @@ class KeyboardTeleopNode : public rclcpp::Node
         if (desired_head_state != current_head_state ){
 
             while (!client_->wait_for_service(1s)) {
-            if (!rclcpp::ok()) {
-                    RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "Interrupted while waiting for the service. Exiting.");
-                    return;
+                if (service_try_count >= 3){
+                    RCLCPP_INFO(this->get_logger(), "Failed: /actuate_head service is not available...");
+                    break;
+                }
+                if (!rclcpp::ok()) {
+                        RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "Interrupted while waiting for the /actuate_head service. Exiting.");
+                        return;
                 } 
-            RCLCPP_INFO(this->get_logger(), "Waiting for the custom service to be available...");
+                RCLCPP_INFO(this->get_logger(), "Waiting for the /actuate_head service to be available...Attempt %d/3", service_try_count+1);
+                service_try_count++;
             }
 
             // Create a request for the custom service
@@ -227,9 +239,9 @@ class KeyboardTeleopNode : public rclcpp::Node
                 [this](rclcpp::Client<juniper_board_msgs::srv::IntTrigger>::SharedFuture future) {
                     auto response = future.get();
                     if (response->success) {
-                        RCLCPP_INFO(this->get_logger(), "Custom service call successful");
+                        RCLCPP_INFO(this->get_logger(), "/actuate_head service call successful: Position %d", desired_head_state);
                     } else {
-                        RCLCPP_WARN(this->get_logger(), "Custom service call failed:");
+                        RCLCPP_WARN(this->get_logger(), "/actuate_head service call failed:");
                     }
                 });
             //Update the current state of the head
