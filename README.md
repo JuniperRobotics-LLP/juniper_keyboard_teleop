@@ -12,6 +12,8 @@ To start the node
 ros2 run juniper_keyboard_teleop juniper_keyboard_teleop
 ```
 
+By default, the "Juniper Keyboard" window will pop up and be in focus. If you leave to another window, make sure to click on the "Juniper Keyboard" window again to engage teleop. It should showcase as a gear on the application pane.
+
 ## Topics
 Node publishes a geometry_msgs/twist message on the default topic of `\cmd_vel`.
 
