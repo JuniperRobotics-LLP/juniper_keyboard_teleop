@@ -4,8 +4,8 @@
   <name>juniper_keyboard_teleop</name>
   <version>0.0.0</version>
   <description>TODO: Package description</description>
-  <maintainer email="dylan.charter@juniperrobotics.com">juniper</maintainer>
-  <license>TODO: License declaration</license>
+  <maintainer email="dylan.charter@juniperrobotics.com">Dylan Charter</maintainer>
+  <license>LGPL-2.1</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
