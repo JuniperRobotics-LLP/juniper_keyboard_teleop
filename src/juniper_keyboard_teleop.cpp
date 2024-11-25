@@ -19,7 +19,7 @@ class KeyboardTeleopNode : public rclcpp::Node
   public:
     KeyboardTeleopNode(): Node("juniper_keyboard_teleop")
     {
-        publisher_ = this->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);
+        publisher_ = this->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel_regulated", 10);
         timer_ = this->create_wall_timer(100ms, std::bind(&KeyboardTeleopNode::timer_callback, this));
 
         this->declare_parameter<float>("linear_vel", 0.35);
