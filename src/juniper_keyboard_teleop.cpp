@@ -11,9 +11,6 @@
 
 using namespace std::chrono_literals;
 
-/* This example creates a subclass of Node and uses std::bind() to register a
-* member function as a callback from the timer. */
-
 class KeyboardTeleopNode : public rclcpp::Node
 {
   public:
@@ -44,7 +41,7 @@ class KeyboardTeleopNode : public rclcpp::Node
         // Define each square
         for (int i = 0; i < 3; ++i) {
             for (int j = 0; j < 3; ++j) {
-                squares[i * 3 + j] = {j * third_width, i * third_height, third_width, third_height};
+                squares[i * 3 + j] = {static_cast<Sint16>(j * third_width),static_cast<Sint16>(i * third_height), static_cast<Uint16>(third_width), static_cast<Uint16>(third_height)};
             }
         }
 
@@ -83,10 +80,17 @@ class KeyboardTeleopNode : public rclcpp::Node
         //The number of tries to wait for the /actuate_head service
         int service_try_count = 0;
 
+        //When the SDL library catches an event on the keyboard
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
+            /*
+            
+            -Parsed which keys are pressed down, assigning a "1" in the keyboard_array indices 0-3 indicate moving
+            -keyboard_array index 4 indicates the state of the head with possible values of 0-6
+            -ESC will exit the node, CTRL+C will as well
+            
+            */ 
             if (event.type == SDL_KEYDOWN) {
-                // RCLCPP_INFO(get_logger(), "KeyDown %d", event.key.keysym.sym);
                 switch (event.key.keysym.sym) {
                     case SDLK_UP:
                         keyboard_array[0]=1;
@@ -131,8 +135,8 @@ class KeyboardTeleopNode : public rclcpp::Node
                 }
             }
 
+            // Check if a key was released, doesn't apply to actuating the head as those keys are not held down
             else if (event.type == SDL_KEYUP) {
-                // RCLCPP_INFO(get_logger(), "KeyUp %d", event.key.keysym.sym);
                 switch (event.key.keysym.sym) {
                     case SDLK_UP:
                         keyboard_array[0]=0;
@@ -194,24 +198,21 @@ class KeyboardTeleopNode : public rclcpp::Node
         }
         //Publish the ROS Message
         publisher_->publish(twist);
-
-        /* Change the color of the window based on if any drive key is still pressed */
         
         //Sum up the keyboard_array to check for drive keys
         for(int i = 0; i < 4 ; i++){
                 drive_sum+=keyboard_array[i];
         }
         
-        //Green if a moving
-        if (drive_sum !=0 ){
-            SDL_Flip(window);  
-        }
-        //Red if stopped        
-        else{
-            SDL_FillRect(window, NULL,SDL_MapRGB(window->format, 0, 0, 0));  
-            SDL_Flip(window);  
-        }
-  
+        //Clear the window if not driving   
+        if (drive_sum ==0 ){
+            SDL_FillRect(window, NULL,SDL_MapRGB(window->format, 0, 0, 0)); 
+        }     
+        
+        //Update the window
+        SDL_Flip(window);  
+
+        //Grab the desired head state from the keyboard_array
         desired_head_state = keyboard_array[4];
         
         //Only call the service when changing head states
@@ -230,11 +231,11 @@ class KeyboardTeleopNode : public rclcpp::Node
                 service_try_count++;
             }
 
-            // Create a request for the custom service
+            // Create a request for the actuate_head
             auto request = std::make_shared<juniper_board_msgs::srv::IntTrigger::Request>();
             request->data = desired_head_state;
 
-            // Asynchronous service call
+            // Move the head to the desired state
             client_->async_send_request(request, 
                 [this](rclcpp::Client<juniper_board_msgs::srv::IntTrigger>::SharedFuture future) {
                     auto response = future.get();
